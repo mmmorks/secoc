@@ -28,7 +28,7 @@ DID_202_IV = b'\x00' * 16
 
 if __name__ == "__main__":
     panda = Panda()
-    panda.set_safety_mode(Panda.SAFETY_ALLOUTPUT)
+    panda.set_safety_mode(Panda.SAFETY_ELM327)
 
     uds_client = UdsClient(panda, ADDR, ADDR + 8, BUS, timeout=0.1, response_pending_timeout=0.1, debug=DEBUG)
 
@@ -160,14 +160,20 @@ if __name__ == "__main__":
         with tqdm(total=end-start) as pbar:
             while start < end:
                 for addr, _, data, bus in panda.can_recv():
+                    if bus != BUS:
+                        continue
+
                     if data == b"\x03\x7f\x31\x78\x00\x00\x00\x00": # Skip response pending
                         continue
 
                     if addr != ADDR + 8:
                         continue
 
+                    if DEBUG:
+                        print(f"{data.hex()}")
+
                     ptr = struct.unpack("<I", data[:4])[0]
-                    assert ptr == start
+                    assert (ptr >> 8) == start & 0xffffff # Check lower 24 bits of address
 
                     extracted += data[4:]
                     f.write(data[4:])
